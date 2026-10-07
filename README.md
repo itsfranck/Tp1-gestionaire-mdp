@@ -64,8 +64,7 @@ Tp1-gestionaire-mdp/
     ├── __init__.py
     └── core/
         ├── __init__.py
-        ├── generator.py  # Classe PasswordGenerator
-        └── storage.py    # Gestion du fichier JSON (Partie 2)
+        |__ generator.py  # Classe PasswordGenerator
 ```
 
 ## Maquettes
