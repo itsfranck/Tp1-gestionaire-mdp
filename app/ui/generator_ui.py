@@ -15,11 +15,15 @@ from app.core.generator import PasswordGenerator
 
 
 class GeneratorDialog(QDialog):
-    """Fenêtre qui génère un mot de passe selon la longueur et les types choisis."""
+    """Fenêtre qui génère un mot de passe selon la longueur et les types choisis.
 
-    def __init__(self, parent=None):
+    Si mode_selection est True (ouverte depuis le formulaire d'ajout), le bouton
+    « Utiliser ce mot de passe » renvoie le mot de passe au formulaire.
+    """
+
+    def __init__(self, parent=None, mode_selection=False):
         """Construit la fenêtre : affichage du mot de passe, boutons Masquer et Copier,
-        longueur, types de caractères et bouton Générer."""
+        longueur, types de caractères et boutons du bas."""
         super().__init__(parent)
         self.setWindowTitle("Générateur de mot de passe")
         self.resize(460, 400)
@@ -105,9 +109,25 @@ class GeneratorDialog(QDialog):
 
         layout_bas = QHBoxLayout()
         layout_bas.addStretch()
+
         bouton_generer = QPushButton("Générer")
         bouton_generer.clicked.connect(self.generer)
-        layout_bas.addWidget(bouton_generer)
+
+        if mode_selection:
+            bouton_annuler = QPushButton("Annuler")
+            bouton_annuler.clicked.connect(self.reject)
+            self.bouton_utiliser = QPushButton("Utiliser ce mot de passe")
+            self.bouton_utiliser.clicked.connect(self.accept)
+            layout_bas.addWidget(bouton_annuler)
+            layout_bas.addWidget(bouton_generer)
+            layout_bas.addWidget(self.bouton_utiliser)
+        else:
+            self.bouton_utiliser = None
+            bouton_fermer = QPushButton("Fermer")
+            bouton_fermer.clicked.connect(self.reject)
+            layout_bas.addWidget(bouton_fermer)
+            layout_bas.addWidget(bouton_generer)
+
         layout.addLayout(layout_bas)
 
         self.setLayout(layout)
@@ -129,7 +149,8 @@ class GeneratorDialog(QDialog):
 
     def generer(self):
         """Crée un mot de passe avec la classe PasswordGenerator de la Partie 1.
-        Si les options sont invalides (aucune case cochée), affiche l'erreur en rouge."""
+        Si les options sont invalides (aucune case cochée), affiche l'erreur en rouge
+        et désactive les boutons Copier et Utiliser."""
         try:
             generateur = PasswordGenerator(
                 longueur=self.slider.value(),
@@ -147,6 +168,9 @@ class GeneratorDialog(QDialog):
             self.label_message.setText(str(erreur))
 
         self.bouton_copier.setEnabled(self.mot_de_passe != "")
+        if self.bouton_utiliser is not None:
+            self.bouton_utiliser.setEnabled(self.mot_de_passe != "")
+
         self.mettre_a_jour_affichage()
 
     def mettre_a_jour_affichage(self):
@@ -172,6 +196,6 @@ class GeneratorDialog(QDialog):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = GeneratorDialog()
+    window = GeneratorDialog(mode_selection=True)
     window.show()
     sys.exit(app.exec())
