@@ -18,25 +18,35 @@ class GeneratorDialog(QDialog):
     """Fenêtre qui génère un mot de passe selon la longueur et les types choisis."""
 
     def __init__(self, parent=None):
-        """Construit la fenêtre : affichage du mot de passe, longueur,
-        types de caractères et bouton Générer."""
+        """Construit la fenêtre : affichage du mot de passe, boutons Masquer et Copier,
+        longueur, types de caractères et bouton Générer."""
         super().__init__(parent)
         self.setWindowTitle("Générateur de mot de passe")
-        self.resize(460, 380)
+        self.resize(460, 400)
 
         self.mot_de_passe = ""
+        self.visible = True
 
         layout = QVBoxLayout()
 
         layout.addWidget(QLabel("Mot de passe"))
         self.label_mdp = QLabel("", alignment=Qt.AlignmentFlag.AlignCenter)
+        self.label_mdp.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.label_mdp.setStyleSheet("font-family: Consolas; font-size: 20px; padding: 12px;"
                                      " border: 1px solid #cccccc; border-radius: 6px;")
         layout.addWidget(self.label_mdp)
 
+        layout_boutons_mdp = QHBoxLayout()
         self.label_message = QLabel("")
-        self.label_message.setStyleSheet("color: red;")
-        layout.addWidget(self.label_message)
+        self.bouton_afficher = QPushButton("Masquer")
+        self.bouton_afficher.clicked.connect(self.basculer_affichage)
+        self.bouton_copier = QPushButton("Copier")
+        self.bouton_copier.clicked.connect(self.copier)
+        layout_boutons_mdp.addWidget(self.label_message)
+        layout_boutons_mdp.addStretch()
+        layout_boutons_mdp.addWidget(self.bouton_afficher)
+        layout_boutons_mdp.addWidget(self.bouton_copier)
+        layout.addLayout(layout_boutons_mdp)
 
         layout.addWidget(QLabel("Longueur"))
 
@@ -133,9 +143,31 @@ class GeneratorDialog(QDialog):
             self.label_message.setText("")
         except ValueError as erreur:
             self.mot_de_passe = ""
+            self.label_message.setStyleSheet("color: red;")
             self.label_message.setText(str(erreur))
 
-        self.label_mdp.setText(self.mot_de_passe)
+        self.bouton_copier.setEnabled(self.mot_de_passe != "")
+        self.mettre_a_jour_affichage()
+
+    def mettre_a_jour_affichage(self):
+        """Affiche le mot de passe en clair ou en astérisques selon self.visible."""
+        if self.visible:
+            self.label_mdp.setText(self.mot_de_passe)
+            self.bouton_afficher.setText("Masquer")
+        else:
+            self.label_mdp.setText("*" * len(self.mot_de_passe))
+            self.bouton_afficher.setText("Afficher")
+
+    def basculer_affichage(self):
+        """Bouton Masquer / Afficher : inverse l'affichage du mot de passe."""
+        self.visible = not self.visible
+        self.mettre_a_jour_affichage()
+
+    def copier(self):
+        """Copie le vrai mot de passe dans le presse-papiers, même s'il est masqué."""
+        QApplication.clipboard().setText(self.mot_de_passe)
+        self.label_message.setStyleSheet("color: green;")
+        self.label_message.setText("Copié !")
 
 
 if __name__ == "__main__":
