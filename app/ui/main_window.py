@@ -6,17 +6,19 @@
 
 import sys
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QApplication, QMainWindow, QWidget, QDialog, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QScrollArea, QMessageBox
 )
 from PySide6.QtCore import Qt
 
 from app.core.storage import VaultStorage
 from app.ui.entry_row import EntryRow
+from app.ui.entry_dialog import EntryDialog
 
 
 class MainWindow(QMainWindow):
-    """Affiche les entrées du coffre-fort dans une liste défilante."""
+    """Affiche les entrées du coffre-fort et permet de les ajouter,
+    modifier et supprimer."""
 
     def __init__(self, chemin_fichier="vault.json"):
         """Construit la fenêtre : barre de boutons, en-têtes, liste défilante
@@ -27,10 +29,14 @@ class MainWindow(QMainWindow):
 
         self.coffre = VaultStorage(chemin_fichier)
         self.lignes = []
+        self.index_selectionne = -1
 
         bouton_ajouter = QPushButton("+ Ajouter")
+        bouton_ajouter.clicked.connect(self.ajouter)
         self.bouton_modifier = QPushButton("Modifier")
+        self.bouton_modifier.clicked.connect(self.modifier_selection)
         self.bouton_supprimer = QPushButton("Supprimer")
+        self.bouton_supprimer.clicked.connect(self.supprimer_selection)
         bouton_generateur = QPushButton("Générateur")
 
         layout_boutons = QHBoxLayout()
@@ -96,6 +102,7 @@ class MainWindow(QMainWindow):
         for index in range(len(self.coffre.entrees)):
             entree = self.coffre.entrees[index]
             ligne = EntryRow(index, entree["email"], entree["mot_de_passe"])
+            ligne.clique.connect(self.selectionner)
             self.layout_liste.addWidget(ligne)
             self.lignes.append(ligne)
 
@@ -107,8 +114,58 @@ class MainWindow(QMainWindow):
 
         self.layout_liste.addStretch()
 
+        if self.index_selectionne >= len(self.lignes):
+            self.index_selectionne = -1
+        self.selectionner(self.index_selectionne)
+
         self.statusBar().showMessage(
             f"{len(self.coffre.entrees)} entrée(s) — {self.coffre.chemin_fichier}")
+
+    def selectionner(self, index):
+        """Met en bleu la ligne cliquée. Modifier et Supprimer ne sont
+        actifs que si une ligne est sélectionnée."""
+        self.index_selectionne = index
+        for ligne in self.lignes:
+            ligne.selectionner(ligne.index == index)
+        self.bouton_modifier.setEnabled(index != -1)
+        self.bouton_supprimer.setEnabled(index != -1)
+
+    def ajouter(self):
+        """Bouton Ajouter : ouvre le formulaire et ajoute l'entrée au coffre."""
+        dialogue = EntryDialog(self, "Ajouter une entrée")
+        if dialogue.exec() == QDialog.DialogCode.Accepted:
+            self.coffre.ajouter(dialogue.email(), dialogue.mot_de_passe())
+            self.index_selectionne = len(self.coffre.entrees) - 1
+            self.rafraichir()
+
+    def modifier_selection(self):
+        """Bouton Modifier : modifie la ligne sélectionnée."""
+        if self.index_selectionne != -1:
+            self.modifier(self.index_selectionne)
+
+    def modifier(self, index):
+        """Ouvre le formulaire prérempli et remplace l'entrée."""
+        entree = self.coffre.entrees[index]
+        dialogue = EntryDialog(self, "Modifier l'entrée",
+                               entree["email"], entree["mot_de_passe"])
+        if dialogue.exec() == QDialog.DialogCode.Accepted:
+            self.coffre.modifier(index, dialogue.email(), dialogue.mot_de_passe())
+            self.rafraichir()
+
+    def supprimer_selection(self):
+        """Bouton Supprimer : supprime la ligne sélectionnée."""
+        if self.index_selectionne != -1:
+            self.supprimer(self.index_selectionne)
+
+    def supprimer(self, index):
+        """Demande une confirmation, puis supprime l'entrée."""
+        email = self.coffre.entrees[index]["email"]
+        reponse = QMessageBox.question(self, "Confirmer la suppression",
+                                       f"Supprimer l'entrée « {email} » ?")
+        if reponse == QMessageBox.StandardButton.Yes:
+            self.coffre.supprimer(index)
+            self.index_selectionne = -1
+            self.rafraichir()
 
 
 if __name__ == "__main__":
