@@ -7,18 +7,19 @@
 import sys
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QDialog, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QScrollArea, QMessageBox
+    QLabel, QPushButton, QScrollArea, QMenu, QMessageBox
 )
 from PySide6.QtCore import Qt
 
 from app.core.storage import VaultStorage
 from app.ui.entry_row import EntryRow
 from app.ui.entry_dialog import EntryDialog
+from app.ui.generator_ui import GeneratorDialog
 
 
 class MainWindow(QMainWindow):
     """Affiche les entrées du coffre-fort et permet de les ajouter,
-    modifier et supprimer."""
+    modifier, supprimer, trier et révéler."""
 
     def __init__(self, chemin_fichier="vault.json"):
         """Construit la fenêtre : barre de boutons, en-têtes, liste défilante
@@ -38,6 +39,7 @@ class MainWindow(QMainWindow):
         self.bouton_supprimer = QPushButton("Supprimer")
         self.bouton_supprimer.clicked.connect(self.supprimer_selection)
         bouton_generateur = QPushButton("Générateur")
+        bouton_generateur.clicked.connect(self.ouvrir_generateur)
 
         layout_boutons = QHBoxLayout()
         layout_boutons.addWidget(bouton_ajouter)
@@ -46,12 +48,15 @@ class MainWindow(QMainWindow):
         layout_boutons.addWidget(bouton_generateur)
         layout_boutons.addStretch()
 
-        label_colonne_email = QLabel("E-MAIL")
+        bouton_trier = QPushButton("E-MAIL ↑")
+        bouton_trier.setFlat(True)
+        bouton_trier.setToolTip("Trier par e-mail")
+        bouton_trier.clicked.connect(self.trier)
         label_colonne_mdp = QLabel("MOT DE PASSE")
         label_colonne_mdp.setMinimumWidth(230)
 
         layout_entetes = QHBoxLayout()
-        layout_entetes.addWidget(label_colonne_email)
+        layout_entetes.addWidget(bouton_trier)
         layout_entetes.addStretch()
         layout_entetes.addWidget(label_colonne_mdp)
 
@@ -103,6 +108,8 @@ class MainWindow(QMainWindow):
             entree = self.coffre.entrees[index]
             ligne = EntryRow(index, entree["email"], entree["mot_de_passe"])
             ligne.clique.connect(self.selectionner)
+            ligne.double_clique.connect(self.reveler)
+            ligne.menu_demande.connect(self.afficher_menu)
             self.layout_liste.addWidget(ligne)
             self.lignes.append(ligne)
 
@@ -129,6 +136,32 @@ class MainWindow(QMainWindow):
             ligne.selectionner(ligne.index == index)
         self.bouton_modifier.setEnabled(index != -1)
         self.bouton_supprimer.setEnabled(index != -1)
+
+    def reveler(self, index):
+        """Double-clic : sélectionne la ligne et révèle son mot de passe."""
+        self.selectionner(index)
+        self.lignes[index].reveler()
+
+    def afficher_menu(self, index, position):
+        """Clic droit : menu Révéler / Copier / Modifier / Supprimer."""
+        self.selectionner(index)
+        menu = QMenu(self)
+        action_reveler = menu.addAction("Révéler le mot de passe")
+        action_copier = menu.addAction("Copier le mot de passe")
+        menu.addSeparator()
+        action_modifier = menu.addAction("Modifier")
+        action_supprimer = menu.addAction("Supprimer")
+
+        choix = menu.exec(position)
+        if choix == action_reveler:
+            self.lignes[index].reveler()
+        elif choix == action_copier:
+            QApplication.clipboard().setText(self.coffre.entrees[index]["mot_de_passe"])
+            self.statusBar().showMessage("Mot de passe copié.", 3000)
+        elif choix == action_modifier:
+            self.modifier(index)
+        elif choix == action_supprimer:
+            self.supprimer(index)
 
     def ajouter(self):
         """Bouton Ajouter : ouvre le formulaire et ajoute l'entrée au coffre."""
@@ -166,6 +199,17 @@ class MainWindow(QMainWindow):
             self.coffre.supprimer(index)
             self.index_selectionne = -1
             self.rafraichir()
+
+    def trier(self):
+        """En-tête E-MAIL ↑ : trie les entrées par ordre alphabétique."""
+        self.coffre.trier()
+        self.index_selectionne = -1
+        self.rafraichir()
+
+    def ouvrir_generateur(self):
+        """Bouton Générateur : ouvre le générateur seul."""
+        generateur = GeneratorDialog(self)
+        generateur.exec()
 
 
 if __name__ == "__main__":
