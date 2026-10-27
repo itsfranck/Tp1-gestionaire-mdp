@@ -153,17 +153,19 @@ class MainWindow(QMainWindow):
             self.rafraichir()
 
     def supprimer(self):
-        """Bouton Supprimer : demande une confirmation puis supprime la ligne sélectionnée."""
+        """Bouton Supprimer : demande une confirmation (Oui / Non) puis supprime la ligne sélectionnée."""
         if self.index_selectionne == -1:
             return
         email = self.coffre.entrees[self.index_selectionne]["email"]
-        reponse = QMessageBox.question(
-            self, "Confirmer",
-            f"Supprimer « {email} » ?",
-            QMessageBox.StandardButton.Yes |
-            QMessageBox.StandardButton.No
-        )
-        if reponse == QMessageBox.StandardButton.Yes:
+
+        boite = QMessageBox(self)
+        boite.setWindowTitle("Confirmer")
+        boite.setText(f"Supprimer « {email} » ?")
+        bouton_oui = boite.addButton("Oui", QMessageBox.ButtonRole.YesRole)
+        boite.addButton("Non", QMessageBox.ButtonRole.NoRole)
+        boite.exec()
+
+        if boite.clickedButton() == bouton_oui:
             self.coffre.supprimer(self.index_selectionne)
             self.rafraichir()
 
