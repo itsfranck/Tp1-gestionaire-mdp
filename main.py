@@ -29,11 +29,13 @@ def lancer_cli(args):
 
 
 def lancer_gui(args):
-    """Mode graphique : ouvre la fenêtre du coffre-fort avec le fichier choisi."""
+    """Mode graphique : applique le style et ouvre la fenêtre du coffre-fort."""
     from PySide6.QtWidgets import QApplication
     from app.ui.main_window import MainWindow
+    from app.ui.style import STYLE
 
     app = QApplication(sys.argv)
+    app.setStyleSheet(STYLE)
     window = MainWindow(args.vault_file)
     window.show()
     sys.exit(app.exec())
