@@ -18,57 +18,55 @@ from app.ui.generator_ui import GeneratorDialog
 
 
 class MainWindow(QMainWindow):
-    """Affiche les entrées du coffre-fort et permet de les ajouter,
-    modifier, supprimer, trier et révéler."""
+    """Affiche les entrées du coffre-fort et permet de les gérer."""
 
     def __init__(self, chemin_fichier="vault.json"):
-        """Construit la fenêtre : barre de boutons, en-têtes, liste défilante
-        et barre d'état. Charge ensuite le fichier JSON."""
+        """Construit la fenêtre (boutons, en-têtes, liste défilante)
+        et charge le fichier JSON."""
         super().__init__()
         self.setWindowTitle("Coffre-fort")
-        self.resize(760, 500)
+        self.resize(700, 450)
 
         self.coffre = VaultStorage(chemin_fichier)
         self.lignes = []
         self.index_selectionne = -1
-
-        bouton_ajouter = QPushButton("+ Ajouter")
-        bouton_ajouter.clicked.connect(self.ajouter)
-        self.bouton_modifier = QPushButton("Modifier")
-        self.bouton_modifier.clicked.connect(self.modifier_selection)
-        self.bouton_supprimer = QPushButton("Supprimer")
-        self.bouton_supprimer.clicked.connect(self.supprimer_selection)
-        bouton_generateur = QPushButton("Générateur")
-        bouton_generateur.clicked.connect(self.ouvrir_generateur)
+        self.tri_inverse = False
 
         layout_boutons = QHBoxLayout()
+        bouton_ajouter = QPushButton("+ Ajouter")
+        bouton_ajouter.setObjectName("principal")
+        bouton_ajouter.clicked.connect(self.ajouter)
+        bouton_modifier = QPushButton("Modifier")
+        bouton_modifier.clicked.connect(self.modifier)
+        bouton_supprimer = QPushButton("Supprimer")
+        bouton_supprimer.clicked.connect(self.supprimer)
+        bouton_generateur = QPushButton("Générateur")
+        bouton_generateur.clicked.connect(self.ouvrir_generateur)
         layout_boutons.addWidget(bouton_ajouter)
-        layout_boutons.addWidget(self.bouton_modifier)
-        layout_boutons.addWidget(self.bouton_supprimer)
+        layout_boutons.addWidget(bouton_modifier)
+        layout_boutons.addWidget(bouton_supprimer)
         layout_boutons.addWidget(bouton_generateur)
         layout_boutons.addStretch()
-
-        bouton_trier = QPushButton("E-MAIL ↑")
-        bouton_trier.setFlat(True)
-        bouton_trier.setToolTip("Trier par e-mail")
-        bouton_trier.clicked.connect(self.trier)
-        label_colonne_mdp = QLabel("MOT DE PASSE")
-        label_colonne_mdp.setMinimumWidth(230)
+        self.bouton_trier = QPushButton("Trier A→Z")
+        self.bouton_trier.clicked.connect(self.trier)
+        layout_boutons.addWidget(self.bouton_trier)
 
         layout_entetes = QHBoxLayout()
-        layout_entetes.addWidget(bouton_trier)
+        label_email = QLabel("E-MAIL")
+        label_mdp = QLabel("MOT DE PASSE")
+        label_mdp.setMinimumWidth(230)
+        layout_entetes.addWidget(label_email)
         layout_entetes.addStretch()
-        layout_entetes.addWidget(label_colonne_mdp)
+        layout_entetes.addWidget(label_mdp)
 
-        self.conteneur = QWidget()
-        self.layout_liste = QVBoxLayout()
+        conteneur = QWidget()
+        conteneur.setStyleSheet("background: white;")
+        self.layout_liste = QVBoxLayout(conteneur)
+        self.layout_liste.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.layout_liste.setSpacing(0)
-        self.layout_liste.setContentsMargins(0, 0, 0, 0)
-        self.conteneur.setLayout(self.layout_liste)
-
         zone_defilement = QScrollArea()
         zone_defilement.setWidgetResizable(True)
-        zone_defilement.setWidget(self.conteneur)
+        zone_defilement.setWidget(conteneur)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -77,17 +75,11 @@ class MainWindow(QMainWindow):
         layout.addLayout(layout_entetes)
         layout.addWidget(zone_defilement)
 
-        self.charger_coffre()
-        self.rafraichir()
-
-    def charger_coffre(self):
-        """Charge le fichier JSON. Si le fichier est corrompu, affiche un
-        avertissement et démarre avec un coffre vide."""
         try:
             self.coffre.charger()
         except ValueError as erreur:
-            QMessageBox.warning(self, "Fichier corrompu",
-                                f"{erreur}\nLe coffre démarre vide.")
+            QMessageBox.warning(self, "Fichier corrompu", f"{erreur}\nLe coffre démarre vide.")
+        self.rafraichir()
 
     def closeEvent(self, event):
         """Appelée automatiquement à la fermeture : sauvegarde le coffre."""
@@ -95,14 +87,11 @@ class MainWindow(QMainWindow):
         event.accept()
 
     def rafraichir(self):
-        """Efface la liste affichée et recrée une ligne par entrée du coffre."""
-        while self.layout_liste.count() > 0:
-            element = self.layout_liste.takeAt(0)
-            widget = element.widget()
-            if widget is not None:
-                widget.setParent(None)
-                widget.deleteLater()
+        """Supprime les anciennes lignes et en crée une par entrée du coffre."""
+        for ligne in self.lignes:
+            ligne.setParent(None)
         self.lignes = []
+        self.index_selectionne = -1
 
         for index in range(len(self.coffre.entrees)):
             entree = self.coffre.entrees[index]
@@ -113,32 +102,16 @@ class MainWindow(QMainWindow):
             self.layout_liste.addWidget(ligne)
             self.lignes.append(ligne)
 
-        if len(self.lignes) == 0:
-            vide = QLabel("Le coffre est vide. Cliquez sur « + Ajouter » pour commencer.",
-                          alignment=Qt.AlignmentFlag.AlignCenter)
-            vide.setStyleSheet("color: gray; padding: 30px;")
-            self.layout_liste.addWidget(vide)
-
-        self.layout_liste.addStretch()
-
-        if self.index_selectionne >= len(self.lignes):
-            self.index_selectionne = -1
-        self.selectionner(self.index_selectionne)
-
-        self.statusBar().showMessage(
-            f"{len(self.coffre.entrees)} entrée(s) — {self.coffre.chemin_fichier}")
+        self.statusBar().showMessage(f"{len(self.lignes)} entrée(s) — {self.coffre.chemin_fichier}")
 
     def selectionner(self, index):
-        """Met en bleu la ligne cliquée. Modifier et Supprimer ne sont
-        actifs que si une ligne est sélectionnée."""
+        """Met en bleu la ligne cliquée."""
         self.index_selectionne = index
         for ligne in self.lignes:
             ligne.selectionner(ligne.index == index)
-        self.bouton_modifier.setEnabled(index != -1)
-        self.bouton_supprimer.setEnabled(index != -1)
 
     def reveler(self, index):
-        """Double-clic : sélectionne la ligne et révèle son mot de passe."""
+        """Double-clic : révèle le mot de passe de la ligne."""
         self.selectionner(index)
         self.lignes[index].reveler()
 
@@ -148,7 +121,6 @@ class MainWindow(QMainWindow):
         menu = QMenu(self)
         action_reveler = menu.addAction("Révéler le mot de passe")
         action_copier = menu.addAction("Copier le mot de passe")
-        menu.addSeparator()
         action_modifier = menu.addAction("Modifier")
         action_supprimer = menu.addAction("Supprimer")
 
@@ -157,59 +129,57 @@ class MainWindow(QMainWindow):
             self.lignes[index].reveler()
         elif choix == action_copier:
             QApplication.clipboard().setText(self.coffre.entrees[index]["mot_de_passe"])
-            self.statusBar().showMessage("Mot de passe copié.", 3000)
         elif choix == action_modifier:
-            self.modifier(index)
+            self.modifier()
         elif choix == action_supprimer:
-            self.supprimer(index)
+            self.supprimer()
 
     def ajouter(self):
-        """Bouton Ajouter : ouvre le formulaire et ajoute l'entrée au coffre."""
-        dialogue = EntryDialog(self, "Ajouter une entrée")
+        """Bouton Ajouter : ouvre le formulaire et ajoute l'entrée."""
+        dialogue = EntryDialog(self)
         if dialogue.exec() == QDialog.DialogCode.Accepted:
-            self.coffre.ajouter(dialogue.email(), dialogue.mot_de_passe())
-            self.index_selectionne = len(self.coffre.entrees) - 1
+            self.coffre.ajouter(dialogue.champ_email.text(), dialogue.champ_mdp.text())
             self.rafraichir()
 
-    def modifier_selection(self):
-        """Bouton Modifier : modifie la ligne sélectionnée."""
-        if self.index_selectionne != -1:
-            self.modifier(self.index_selectionne)
-
-    def modifier(self, index):
-        """Ouvre le formulaire prérempli et remplace l'entrée."""
-        entree = self.coffre.entrees[index]
-        dialogue = EntryDialog(self, "Modifier l'entrée",
-                               entree["email"], entree["mot_de_passe"])
+    def modifier(self):
+        """Bouton Modifier : ouvre le formulaire prérempli pour la ligne sélectionnée."""
+        if self.index_selectionne == -1:
+            return
+        entree = self.coffre.entrees[self.index_selectionne]
+        dialogue = EntryDialog(self, "Modifier l'entrée", entree["email"], entree["mot_de_passe"])
         if dialogue.exec() == QDialog.DialogCode.Accepted:
-            self.coffre.modifier(index, dialogue.email(), dialogue.mot_de_passe())
+            self.coffre.modifier(self.index_selectionne,
+                                 dialogue.champ_email.text(), dialogue.champ_mdp.text())
             self.rafraichir()
 
-    def supprimer_selection(self):
-        """Bouton Supprimer : supprime la ligne sélectionnée."""
-        if self.index_selectionne != -1:
-            self.supprimer(self.index_selectionne)
-
-    def supprimer(self, index):
-        """Demande une confirmation, puis supprime l'entrée."""
-        email = self.coffre.entrees[index]["email"]
-        reponse = QMessageBox.question(self, "Confirmer la suppression",
-                                       f"Supprimer l'entrée « {email} » ?")
+    def supprimer(self):
+        """Bouton Supprimer : demande une confirmation puis supprime la ligne sélectionnée."""
+        if self.index_selectionne == -1:
+            return
+        email = self.coffre.entrees[self.index_selectionne]["email"]
+        reponse = QMessageBox.question(
+            self, "Confirmer",
+            f"Supprimer « {email} » ?",
+            QMessageBox.StandardButton.Yes |
+            QMessageBox.StandardButton.No
+        )
         if reponse == QMessageBox.StandardButton.Yes:
-            self.coffre.supprimer(index)
-            self.index_selectionne = -1
+            self.coffre.supprimer(self.index_selectionne)
             self.rafraichir()
 
     def trier(self):
-        """En-tête E-MAIL ↑ : trie les entrées par ordre alphabétique."""
-        self.coffre.trier()
-        self.index_selectionne = -1
+        """Bouton Trier : trie A→Z, puis Z→A au clic suivant, et ainsi de suite."""
+        self.coffre.trier(self.tri_inverse)
         self.rafraichir()
+        self.tri_inverse = not self.tri_inverse
+        if self.tri_inverse:
+            self.bouton_trier.setText("Trier Z→A")
+        else:
+            self.bouton_trier.setText("Trier A→Z")
 
     def ouvrir_generateur(self):
         """Bouton Générateur : ouvre le générateur seul."""
-        generateur = GeneratorDialog(self)
-        generateur.exec()
+        GeneratorDialog(self).exec()
 
 
 if __name__ == "__main__":
